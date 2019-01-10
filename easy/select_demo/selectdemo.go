@@ -31,6 +31,9 @@ func main() {
 
 	go func() {
 		for i := 0; i < 10; i++ {
+			fmt.Printf("send c1: %d\n", i)
+			fmt.Printf("send c2: %d\n", i+100)
+
 			c1 <- i
 			c2 <- i + 100
 		}
@@ -38,4 +41,11 @@ func main() {
 	}()
 
 	receiver(c1, c2, quit)
+
+	select {
+	case x := <-c1:
+		fmt.Printf("got data from c1: %d\n", x)
+	default:
+		fmt.Printf("in blocking state, then return.\n")
+	}
 }
