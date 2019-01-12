@@ -60,6 +60,7 @@ func main() {
 
 	fmt.Printf("---------------------------------------------\n")
 	mPrint := v.MethodByName("Print")
+	// 转化为[]byte
 	args := []reflect.Value{reflect.ValueOf("前缀")}
 
 	fmt.Println(mPrint.Call(args))
