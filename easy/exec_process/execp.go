@@ -19,8 +19,7 @@ func main() {
 	args := []string{"ls", "-a", "-l", "-h"}
 
 	env := os.Environ()
-
-	fmt.Println(env)
+	//fmt.Println(env)
 
 	execErr := syscall.Exec(binary, args, env)
 	if execErr != nil {
