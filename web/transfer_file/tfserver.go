@@ -19,7 +19,7 @@ func main() {
 }
 
 func handleIndex(writer http.ResponseWriter, request *http.Request) {
-	Openfile, err := os.Open("web/index.html")
+	Openfile, err := os.Open("root/index.html")
 	defer Openfile.Close() //Close after function return
 	if err != nil {
 		//File not found, send 404
