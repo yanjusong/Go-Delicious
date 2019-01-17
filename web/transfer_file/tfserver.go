@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -43,15 +44,41 @@ func handleDownload(writer http.ResponseWriter, request *http.Request) {
 	//url := "https://github.com/yanjusong/Algorithm/archive/master.zip"
 	resp, err := http.Get(fileurl)
 	if err != nil {
-		panic(err)
+		http.Error(writer, "request "+fileurl+" error.", 400)
+		return
 	}
 	defer resp.Body.Close()
 
 	fmt.Println(resp.Header)
 
-	writer.Header().Set("Content-Disposition", resp.Header.Get("Content-Disposition"))
+	dispositionArray, ok := resp.Header["nickname"]
+	disposition := ""
+
+	if ok {
+		disposition = dispositionArray[0]
+	}
+
+	if ok && len(disposition) > 0 {
+		fmt.Printf("disposition is %s. size:%d\n", disposition, len(disposition))
+	} else {
+		fmt.Printf("can't find disposition in m.\n")
+		lastIndex := strings.LastIndex(fileurl, "/")
+		filename := ""
+		if lastIndex < len(fileurl) {
+			filename = fileurl[lastIndex+1:]
+			if len(filename) == 0 {
+				filename = fileurl + ".html"
+			}
+			if len(filename) == 0 {
+				filename = "unknow.html"
+			}
+		}
+
+		disposition = "attachment; filename=" + filename
+	}
+
+	writer.Header().Set("Content-Disposition", disposition)
 	writer.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-	// writer.Header().Set("Content-Length", "416011")
 
 	io.Copy(writer, resp.Body)
 }

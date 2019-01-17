@@ -50,7 +50,22 @@ func test2() {
 	fmt.Println(map2)
 }
 
+func test3() {
+	m := make(map[string]string)
+	m["name"] = "tom"
+	m["nickname"] = ""
+
+	nickname, ok := m["nickname"]
+
+	if ok {
+		fmt.Printf("nickname is %s. size:%d\n", nickname, len(nickname))
+	} else {
+		fmt.Printf("can't find nickname in m.\n")
+	}
+}
+
 func main() {
-	test1()
-	test2()
+	// test1()
+	// test2()
+	test3()
 }
