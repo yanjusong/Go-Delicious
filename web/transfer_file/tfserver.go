@@ -12,7 +12,7 @@ func main() {
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/download", handleDownload)
 
-	err := http.ListenAndServe(":9090", nil)
+	err := http.ListenAndServe(":9543", nil)
 	if err != nil {
 		fmt.Println(err)
 	}
