@@ -68,6 +68,7 @@ func main() {
 	{
 		nums := [3]int{1, 2, 3}
 		fmt.Println(nums)
+		// 传入的参数是数组指针
 		change(&nums)
 		fmt.Println(nums)
 	}
