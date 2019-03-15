@@ -11,16 +11,16 @@ func intSeq() func() int {
 }
 
 func main() {
-	nextInt := intSeq()
+	nextInt1 := intSeq()
 
-	fmt.Println(nextInt())
-	fmt.Println(nextInt())
-	fmt.Println(nextInt())
+	fmt.Println(nextInt1())
+	fmt.Println(nextInt1())
+	fmt.Println(nextInt1())
 
-	newInts := intSeq()
-	fmt.Println(newInts())
-	fmt.Println(newInts())
+	newInt2 := intSeq()
+	fmt.Println(newInt2())
+	fmt.Println(newInt2())
 
-	newInts = intSeq()
-	fmt.Println(newInts())
+	newInt2 = intSeq()
+	fmt.Println(newInt2())
 }
