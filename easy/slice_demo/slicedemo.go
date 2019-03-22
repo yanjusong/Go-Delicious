@@ -39,8 +39,31 @@ func test_copy() {
 	printSliceInfo(s2)
 }
 
+func test_range() {
+	nums := []int{1, 2, 3, 4}
+	breakIndex := 0
+
+	for {
+		// Breaking as son as it's value greater than 3
+		if breakIndex > 3 {
+			break
+		}
+		breakIndex++
+
+		// x只是传值
+		for i, x := range nums {
+			fmt.Printf("(%d:%d) ", i, x)
+			// x += 100
+			nums[i] += 100
+		}
+		fmt.Printf("\n")
+	}
+}
+
 func main() {
-	test_slice()
-	test_append()
-	test_copy()
+	// test_slice()
+	// test_append()
+	// test_copy()
+
+	test_range()
 }
