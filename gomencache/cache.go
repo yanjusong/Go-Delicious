@@ -90,6 +90,34 @@ func (cache *Cache) Set(key string, value []byte) error {
 	return nil
 }
 
+// Get value by specified key.
+func (cache *Cache) Get(key string) (value []byte, ok bool) {
+	cache.Lock()
+	defer cache.Unlock()
+
+	// TODO: validate key.
+	i, ok := cache.hashmap[key]
+	if ok == false {
+		return nil, false
+	}
+
+	// move the item got by you to rear of the LRU list.
+	cache.fresh(key)
+
+	// do not return `i.value` directly.
+	result := make([]byte, len(i.value))
+	copy(result, i.value)
+
+	return result, true
+}
+
+// Delete an item in hashmap, also in LRU list.
+func (cache *Cache) Delete(key string) {
+	cache.Lock()
+	defer cache.Unlock()
+	cache.delete(key)
+}
+
 func (cache *Cache) fresh(key string) {
 	i, ok := cache.hashmap[key]
 	if ok == false {
@@ -126,27 +154,6 @@ func (cache *Cache) pop() {
 	cache.delete(firstItem.key)
 }
 
-// Get value by specified key.
-func (cache *Cache) Get(key string) (value []byte, ok bool) {
-	cache.Lock()
-	defer cache.Unlock()
-
-	// TODO: validate key.
-	i, ok := cache.hashmap[key]
-	if ok == false {
-		return nil, false
-	}
-
-	// move the item got by you to rear of the LRU list.
-	cache.fresh(key)
-
-	// do not return `i.value` directly.
-	result := make([]byte, len(i.value))
-	copy(result, i.value)
-
-	return result, true
-}
-
 func (cache *Cache) delete(key string) {
 	i, ok := cache.hashmap[key]
 	if ok == false {
@@ -163,11 +170,4 @@ func (cache *Cache) delete(key string) {
 	nextItem.prev = prevItem
 
 	delete(cache.hashmap, key)
-}
-
-// Delete an item in hashmap, also in LRU list.
-func (cache *Cache) Delete(key string) {
-	cache.Lock()
-	defer cache.Unlock()
-	cache.delete(key)
 }

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
 	"net"
 )
 
@@ -24,8 +22,6 @@ func (server *Server) Run(maxBufferSize int) error {
 
 	cache := GetCache(maxBufferSize)
 
-	fmt.Println(cache)
-
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -33,23 +29,5 @@ func (server *Server) Run(maxBufferSize int) error {
 		}
 
 		go handleConnection(conn, cache)
-	}
-}
-
-func handleConnection(conn net.Conn, cache *Cache) {
-	connDesc := conn.RemoteAddr().String()
-	fmt.Printf("Connected: %s\n", connDesc)
-
-	defer conn.Close()
-
-	for {
-		data, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		fmt.Printf("Client[%s]:%s\n", connDesc, data)
-		conn.Write([]byte(data))
 	}
 }
