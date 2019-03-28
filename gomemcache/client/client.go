@@ -7,7 +7,38 @@ import (
 	"os"
 )
 
+const (
+	SET      = 1
+	GET byte = 2
+	DEL byte = 3
+	ERR byte = 50
+)
+
+func doNothing(buffer []byte) {
+	buffer[0] = 200
+	buffer = buffer[3:4]
+}
+
 func main() {
+	nums := []byte{1, 2, 3, 4}
+	doNothing(nums)
+	fmt.Println(nums)
+	nums2 := []byte{}
+	nums2 = append(nums2, nums[2:3]...)
+	fmt.Println(nums2)
+	nums2[0] = 100
+	fmt.Println(nums)
+	fmt.Println(nums2)
+
+	str := []byte("hello")
+	strs := string(str)
+	fmt.Println(str)
+	fmt.Println(strs)
+
+	str[2] = 'L'
+	fmt.Println(str)
+	fmt.Println(strs)
+	return
 	// fmt.Println(nslice[0])
 	// fmt.Println(nslice[1])
 	// fmt.Println(nslice[2])
