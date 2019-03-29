@@ -59,27 +59,16 @@ func makeDeleteBytes(key string) []byte {
 	return makeBytesWithType(key, DEL)
 }
 
-func TestClientSet(t *testing.T) {
-	go func() {
-		server := Server{"127.0.0.1", "1234"}
-		server.Run(4 * 1024 * 1024)
-	}()
-
-	<-time.After(2 * time.Second)
-
-	conn, err := net.Dial("tcp", "127.0.0.1:1234")
-	assert.Equal(t, err, nil)
-
-	setBuffer := makeSetBytes("name", []byte("jerry"))
+func setTriggle(t testing.TB, conn net.Conn, key string, value []byte, buffer []byte) {
+	setBuffer := makeSetBytes(key, value)
 	wn, wok := conn.Write(setBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(setBuffer))
+	assert.Equal(t, nil, wok)
+	assert.Equal(t, len(setBuffer), wn)
 
-	buffer := []byte{}
 	for {
 		readBuf := make([]byte, 256)
 		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
+		assert.Equal(t, nil, err)
 
 		t.Logf("Recv %d bytes from server", n)
 
@@ -97,12 +86,116 @@ func TestClientSet(t *testing.T) {
 			continue
 		}
 
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), SET)
-		assert.Equal(t, int(buffer[5]), 1)
+		assert.Equal(t, int(totalBytes), curBytes)
+		assert.Equal(t, SET, int(buffer[4]))
+		assert.Equal(t, 1, int(buffer[5]))
+
+		buffer = buffer[totalBytes:]
+		assert.Equal(t, 0, len(buffer))
 
 		break
 	}
+}
+
+func delTriggle(t testing.TB, conn net.Conn, key string, buffer []byte) {
+	setBuffer := makeDeleteBytes(key)
+	wn, wok := conn.Write(setBuffer)
+	assert.Equal(t, nil, wok)
+	assert.Equal(t, len(setBuffer), wn)
+
+	for {
+		readBuf := make([]byte, 256)
+		n, err := bufio.NewReader(conn).Read(readBuf)
+		assert.Equal(t, nil, err)
+
+		t.Logf("Recv %d bytes from server", n)
+
+		buffer = append(buffer, readBuf[:n]...)
+
+		if n == 0 || len(buffer) < 4 {
+			continue
+		}
+
+		totalBytes := binary.LittleEndian.Uint32(buffer)
+		curBytes := len(buffer)
+		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
+
+		if curBytes < int(totalBytes) {
+			continue
+		}
+
+		assert.Equal(t, int(totalBytes), curBytes)
+		assert.Equal(t, DEL, int(buffer[4]))
+		assert.Equal(t, 1, int(buffer[5]))
+
+		buffer = buffer[totalBytes:]
+		assert.Equal(t, 0, len(buffer))
+
+		break
+	}
+}
+
+func getTriggle(t testing.TB, conn net.Conn, key string, expectedStat int, expectedStrLen int, expectedStr string, buffer []byte) {
+	getBuffer := makeGetBytes(key)
+	wn, wok := conn.Write(getBuffer)
+	assert.Equal(t, nil, wok)
+	assert.Equal(t, len(getBuffer), wn)
+
+	for {
+		readBuf := make([]byte, 256)
+		n, err := bufio.NewReader(conn).Read(readBuf)
+		assert.Equal(t, nil, err)
+
+		t.Logf("Recv %d bytes from server", n)
+
+		buffer = append(buffer, readBuf[:n]...)
+
+		if n == 0 || len(buffer) < 4 {
+			continue
+		}
+
+		totalBytes := binary.LittleEndian.Uint32(buffer)
+		curBytes := len(buffer)
+		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
+
+		if curBytes < int(totalBytes) {
+			continue
+		}
+
+		assert.Equal(t, int(totalBytes), curBytes)
+		assert.Equal(t, GET, int(buffer[4]))
+		assert.Equal(t, expectedStat, int(buffer[5]))
+
+		bufferCpy := buffer[6:]
+		valueBytes := binary.LittleEndian.Uint32(bufferCpy)
+		assert.Equal(t, 4+expectedStrLen, int(valueBytes))
+
+		if expectedStat == 1 {
+			assert.Equal(t, expectedStr, string(bufferCpy[4:]))
+		}
+
+		buffer = buffer[totalBytes:]
+		assert.Equal(t, 0, len(buffer))
+		break
+	}
+}
+
+func TestClientSet(t *testing.T) {
+	go func() {
+		server := Server{"127.0.0.1", "1234"}
+		server.Run(4 * 1024 * 1024)
+	}()
+
+	<-time.After(2 * time.Second)
+
+	conn, err := net.Dial("tcp", "127.0.0.1:1234")
+	assert.Equal(t, nil, err)
+
+	buffer := []byte{}
+	setTriggle(t, conn, "name", []byte("jerry"), buffer)
+	setTriggle(t, conn, "", []byte("jerry"), buffer)
+	setTriggle(t, conn, "", []byte(""), buffer)
+	setTriggle(t, conn, "addr", []byte(""), buffer)
 }
 
 func TestClientGet(t *testing.T) {
@@ -114,121 +207,12 @@ func TestClientGet(t *testing.T) {
 	<-time.After(2 * time.Second)
 
 	conn, err := net.Dial("tcp", "127.0.0.1:1234")
-	assert.Equal(t, err, nil)
-
-	setBuffer := makeSetBytes("name", []byte("jerry"))
-	wn, wok := conn.Write(setBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(setBuffer))
+	assert.Equal(t, nil, err)
 
 	buffer := []byte{}
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), SET)
-		assert.Equal(t, int(buffer[5]), 1)
-
-		buffer = buffer[totalBytes:]
-
-		break
-	}
-
-	// request server for get `name`.
-	getBuffer := makeGetBytes("name")
-	wn, wok = conn.Write(getBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(getBuffer))
-
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), GET)
-		assert.Equal(t, int(buffer[5]), 1)
-
-		bufferCpy := buffer[6:]
-		valueBytes := binary.LittleEndian.Uint32(bufferCpy)
-		assert.Equal(t, int(valueBytes), 9)
-		assert.Equal(t, string(bufferCpy[4:]), "jerry")
-
-		buffer = buffer[totalBytes:]
-		break
-	}
-
-	// request server for get `NAME`.
-	getBuffer = makeGetBytes("NAME")
-	wn, wok = conn.Write(getBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(getBuffer))
-
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), GET)
-		assert.Equal(t, int(buffer[5]), 0)
-
-		buffer = buffer[6:]
-		valueBytes := binary.LittleEndian.Uint32(buffer)
-		assert.Equal(t, int(valueBytes), 4)
-
-		break
-	}
+	setTriggle(t, conn, "name", []byte("jerry"), buffer)
+	getTriggle(t, conn, "name", 1, 5, "jerry", buffer)
+	getTriggle(t, conn, "NAME", 0, 0, "", buffer)
 }
 
 func TestClientDelete(t *testing.T) {
@@ -240,156 +224,13 @@ func TestClientDelete(t *testing.T) {
 	<-time.After(2 * time.Second)
 
 	conn, err := net.Dial("tcp", "127.0.0.1:1234")
-	assert.Equal(t, err, nil)
-
-	// request server for set `name:jerry`.
-	setBuffer := makeSetBytes("name", []byte("jerry"))
-	wn, wok := conn.Write(setBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(setBuffer))
+	assert.Equal(t, nil, err)
 
 	buffer := []byte{}
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), SET)
-		assert.Equal(t, int(buffer[5]), 1)
-
-		buffer = buffer[totalBytes:]
-		break
-	}
-
-	// request server for get `name`.
-	getBuffer := makeGetBytes("name")
-	wn, wok = conn.Write(getBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(getBuffer))
-
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), GET)
-		assert.Equal(t, int(buffer[5]), 1)
-
-		bufferCpy := buffer[6:]
-		valueBytes := binary.LittleEndian.Uint32(bufferCpy)
-		assert.Equal(t, int(valueBytes), 9)
-		assert.Equal(t, string(bufferCpy[4:]), "jerry")
-
-		buffer = buffer[totalBytes:]
-		break
-	}
-
-	// request server for delete `name`.
-	setBuffer = makeDeleteBytes("name")
-	wn, wok = conn.Write(setBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(setBuffer))
-
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), DEL)
-		assert.Equal(t, int(buffer[5]), 1)
-
-		buffer = buffer[totalBytes:]
-		break
-	}
-
-	// request server for get `name` again, `name:jerry` is deleted in previous.
-	getBuffer = makeGetBytes("name")
-	wn, wok = conn.Write(getBuffer)
-	assert.Equal(t, wok, nil)
-	assert.Equal(t, wn, len(getBuffer))
-
-	for {
-		readBuf := make([]byte, 256)
-		n, err := bufio.NewReader(conn).Read(readBuf)
-		assert.Equal(t, err, nil)
-
-		t.Logf("Recv %d bytes from server", n)
-
-		buffer = append(buffer, readBuf[:n]...)
-
-		if n == 0 || len(buffer) < 4 {
-			continue
-		}
-
-		totalBytes := binary.LittleEndian.Uint32(buffer)
-		curBytes := len(buffer)
-		t.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-		if curBytes < int(totalBytes) {
-			continue
-		}
-
-		assert.Equal(t, curBytes, int(totalBytes))
-		assert.Equal(t, int(buffer[4]), GET)
-		assert.Equal(t, int(buffer[5]), 0)
-
-		buffer = buffer[6:]
-		valueBytes := binary.LittleEndian.Uint32(buffer)
-		assert.Equal(t, int(valueBytes), 4)
-
-		break
-	}
+	setTriggle(t, conn, "name", []byte("jerry"), buffer)
+	getTriggle(t, conn, "name", 1, 5, "jerry", buffer)
+	delTriggle(t, conn, "name", buffer)
+	getTriggle(t, conn, "name", 0, 0, "", buffer)
 }
 
 // following are benchmark functions.
@@ -405,91 +246,17 @@ func BenchmarkSet(b *testing.B) {
 	b.StartTimer()
 	i := 0
 	b.RunParallel(func(pb *testing.PB) {
+		buffer := []byte{}
+
 		for pb.Next() {
 			i++
 			conn, err := net.Dial("tcp", "127.0.0.1:1234")
-			assert.Equal(b, err, nil)
+			assert.Equal(b, nil, err)
 
 			keyStr := "name" + strconv.Itoa(i)
-			setBuffer := makeSetBytes(keyStr, []byte("jerry"))
-			b.Logf(keyStr)
-			wn, wok := conn.Write(setBuffer)
-			assert.Equal(b, wok, nil)
-			assert.Equal(b, wn, len(setBuffer))
 
-			buffer := []byte{}
-			for {
-				readBuf := make([]byte, 256)
-				n, err := bufio.NewReader(conn).Read(readBuf)
-				assert.Equal(b, err, nil)
-
-				b.Logf("Recv %d bytes from server", n)
-
-				buffer = append(buffer, readBuf[:n]...)
-
-				if n == 0 || len(buffer) < 4 {
-					continue
-				}
-
-				totalBytes := binary.LittleEndian.Uint32(buffer)
-				curBytes := len(buffer)
-				b.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-				if curBytes < int(totalBytes) {
-					continue
-				}
-
-				assert.Equal(b, curBytes, int(totalBytes))
-				assert.Equal(b, int(buffer[4]), SET)
-				assert.Equal(b, int(buffer[5]), 1)
-
-				buffer = buffer[totalBytes:]
-
-				break
-			}
+			setTriggle(b, conn, keyStr, []byte("jerry"), buffer)
+			getTriggle(b, conn, keyStr, 1, 5, "jerry", buffer)
 		}
 	})
-
-	// for i := 0; i < b.N; i++ {
-	// 	conn, err := net.Dial("tcp", "127.0.0.1:1234")
-	// 	assert.Equal(b, err, nil)
-
-	// 	keyStr := "name" + strconv.Itoa(i)
-	// 	setBuffer := makeSetBytes(keyStr, []byte("jerry"))
-	// 	b.Logf(keyStr)
-	// 	wn, wok := conn.Write(setBuffer)
-	// 	assert.Equal(b, wok, nil)
-	// 	assert.Equal(b, wn, len(setBuffer))
-
-	// 	buffer := []byte{}
-	// 	for {
-	// 		readBuf := make([]byte, 256)
-	// 		n, err := bufio.NewReader(conn).Read(readBuf)
-	// 		assert.Equal(b, err, nil)
-
-	// 		b.Logf("Recv %d bytes from server", n)
-
-	// 		buffer = append(buffer, readBuf[:n]...)
-
-	// 		if n == 0 || len(buffer) < 4 {
-	// 			continue
-	// 		}
-
-	// 		totalBytes := binary.LittleEndian.Uint32(buffer)
-	// 		curBytes := len(buffer)
-	// 		b.Logf("Recv progress %d/%d\n", curBytes, totalBytes)
-
-	// 		if curBytes < int(totalBytes) {
-	// 			continue
-	// 		}
-
-	// 		assert.Equal(b, curBytes, int(totalBytes))
-	// 		assert.Equal(b, int(buffer[4]), SET)
-	// 		assert.Equal(b, int(buffer[5]), 1)
-
-	// 		buffer = buffer[totalBytes:]
-
-	// 		break
-	// 	}
-	// }
 }
