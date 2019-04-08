@@ -1,0 +1,12 @@
+# 使用sql-migrate进行数据库操作
+
+## UP
+sql-migrate up -config mysql/dbconfig.yml
+
+## DOWN
+sql-migrate down -config mysql/dbconfig.yml
+默认回滚一步，可以使用 `-limit` 回滚多步，如下命令
+sql-migrate down -config mysql/dbconfig.yml -limit 2
+
+## STATUS
+sql-migrate status -config mysql/dbconfig.yml
