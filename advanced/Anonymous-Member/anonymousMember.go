@@ -97,4 +97,21 @@ func main() {
 	fmt.Println("\npos 4:")
 	fmt.Println(pb)
 	callFoo(pb)
+
+	fmt.Println("======")
+	aa := A{}
+	aa.foo()
+	aa.bar()
+
+	fmt.Println("======")
+	// 下面的代码出错，B的匿名字段*Base没有初始化，B的对象bb不能访问bb的函数
+	// bb := B{}
+	// bb.bar()
+	// bb.foo()
+
+	bb := B{
+		Base: &Base{},
+	}
+	bb.bar()
+	bb.foo()
 }
