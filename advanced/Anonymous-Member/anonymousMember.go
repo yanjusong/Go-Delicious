@@ -52,6 +52,11 @@ func main() {
 	}
 	callFoo(&base)
 	// callFoo(base) // error，因为规则1
+	// 这里错误原因是Base没有实现interface anier的方法bar,bar的有pointer receiver.
+	// 那为什么`base.bar()`可以调用呢？
+	// 因为编译器会转化为如下调用方式：
+	// pFunc := (*Base).bar
+	// pFunc(&base)
 
 	i = &base
 	callFoo(i)
