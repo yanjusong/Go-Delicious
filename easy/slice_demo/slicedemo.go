@@ -60,10 +60,19 @@ func test_range() {
 	}
 }
 
+func test_append2() {
+	var nums []int
+	for i := 0; i < 10; i++ {
+		nums = append(nums, i)
+	}
+
+	fmt.Println(nums)
+}
+
 func main() {
 	// test_slice()
 	// test_append()
 	// test_copy()
-
-	test_range()
+	// test_range()
+	test_append2()
 }
